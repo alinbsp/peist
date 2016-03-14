@@ -1,11 +1,19 @@
 -module(hazard).
--export([parse/1, eval/1, eval/2, throw_hazard/1, throw_erlang/1, require_file/1, require_file/2]).
+-export([parse/1, parse/3, eval/1, eval/2, eval/3, throw_hazard/1, throw_erlang/1, require_file/1, require_file/2]).
 
 eval(String) -> eval(String, []).
 
 eval(String, Binding) ->
   {value, Value, NewBinding} = erl_eval:exprs(parse(String), Binding),
   {Value, NewBinding}.
+
+eval(String, Binding, Filename) ->
+  SelfBinding = case proplists:get_value(self, Binding) of
+    undefined -> lists:append(Binding, [{self,hazard_constants:lookup('Object')}]);
+    _  -> Binding
+  end,
+  {value, Value, NewBinding} = erl_eval:exprs(parse(String, SelfBinding, Filename), SelfBinding),
+  {Value, proplists:delete(self, NewBinding)}.
 
 require_file(Path) ->
   Dirname = filename:dirname(?FILE),
@@ -42,6 +50,10 @@ parse(String) ->
 	{ok, ParseTree} = hazard_parser:parse(Tokens),
   Transform = fun(X, Acc) -> [transform(X)|Acc] end,
   lists:foldr(Transform, [], ParseTree).
+
+  parse(String, Binding, Filename) ->
+    { NewForms, _ } = hazard_transform:parse(String, Binding, Filename),
+    NewForms.
 
 transform({ binary_op, Line, Op, Left, Right }) ->
   {op, Line, Op, transform(Left), transform(Right)};
