@@ -1,0 +1,2 @@
+#!/bin/sh
+erl -I include -noshell -pa ebin -eval "hazard:require_file(\"$1\", [\".\"]), halt()."

@@ -1,11 +1,30 @@
 -module(hazard).
--export([parse/1, eval/1, eval/2, throw_hazard/1, throw_erlang/1]).
+-export([parse/1, eval/1, eval/2, throw_hazard/1, throw_erlang/1, require_file/1, require_file/2]).
 
 eval(String) -> eval(String, []).
 
 eval(String, Binding) ->
   {value, Value, NewBinding} = erl_eval:exprs(parse(String), Binding),
   {Value, NewBinding}.
+
+require_file(Path) ->
+  Dirname = filename:dirname(?FILE),
+  Paths = [
+    filename:join([Dirname, "..", "lib"]),
+    filename:join([Dirname, "..", "test", "hazard"])
+  ],
+  require_file(Path ++ ".hz", Paths).
+
+require_file(Path, []) ->
+  hazard_errors:raise(enoent, "could not load file ~ts", [Path]);
+
+require_file(Path, [H|T]) ->
+  Filepath = filename:join(H, Path),
+  case file:read_file(Filepath) of
+    { ok, Binary } -> eval(binary_to_list(Binary), [], Filepath);
+    { error, enoent } -> require_file(Path, T);
+    { error, Reason } -> hazard_errors:raise(Reason, "could not load file ~ts", [Filepath])
+  end.
 
 % Temporary to aid debugging
 throw_hazard(String) ->
